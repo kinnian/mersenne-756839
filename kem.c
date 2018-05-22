@@ -7,19 +7,24 @@
 unsigned char n = 756839;
 unsigned char h = 256;
 unsigned char rho = 2048;
-unsigned char P = 2^n - 1;
+unsigned char P = 2**n - 1;
 unsigned char K = 32*ceil(n/256);
 
-// TODO: implementer correctement les pounsigned chareurs et listes d'octets / de bits et les concatenations et parse
+// TODO: implementer correctement les pointeurs et listes d'octets / de bits et les concatenations et parse
 
 void key_gen(unsigned char * pk, unsigned char * sk){
+	pk = malloc(2*n);
+	sk = malloc(2*n);
+
 	unsigned char F = rand() % n; //TODO: HAM(F) = h
 	unsigned char G = rand() % n; //TODO: HAM(G) = h
 	unsigned char R = rand() % n;
 
 	unsigned char T = (F*R + G) % P; // calculs modulo P
-	pk = (R,T); 
-	sk = F;
+
+	strcpy(pk, R);
+	strcat(pk, T);
+	strcpy(sk, F);
 
 	return;
 }
