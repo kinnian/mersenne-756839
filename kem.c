@@ -4,11 +4,11 @@
 
 // Variables globales
 
-unsigned char n = 756839;
-unsigned char h = 256;
-unsigned char rho = 2048;
-unsigned char P = 2**n - 1;
-unsigned char K = 32*ceil(n/256);
+int const n = 756839;
+int const h = 256;
+int const rho = 2048;
+int const P = (2**n - 1);
+int const K = 32*ceil(n/256);
 
 // TODO: implementer correctement les pointeurs et listes d'octets / de bits et les concatenations et parse
 
@@ -53,7 +53,7 @@ int decaps(unsigned char * sk, unsigned char * pk, unsigned char * C, unsigned c
 	unsigned char R = pk[0:n-1];
 	unsigned char T = pk[n:2*n-1];
 
-	KK = decode((sk*C_1)^C_2) // TODO: implem decode
+	KK = decode((sk*C_1)^C_2); // TODO: implem decode
 	unsigned char AA = H_1(KK);
 	unsigned char BB_1 = H_2(KK);
 	unsigned char BB_2 = H_3(KK);
