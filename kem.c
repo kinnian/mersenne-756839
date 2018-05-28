@@ -21,9 +21,26 @@ struct ciphertext {
 	unsigned char * C_2;
 };
 
-int random_mod(int m) {
+int char_to_int(unsigned char * c[n]) {
+	int a = 0;
+	for (int i = 0; i < n; i++) {
+		int j = c[i] - '0';
+		a = a + pow(2, i)*j;
+	}
+	return a;
+}
+
+unsigned char * int_to_char(int a) {
+	unsigned char * c[n];
+	for (int i = 0; i < n; i ++) {
+		c[i] = (a % (int)pow(2,i));
+	}
+	return c;
+}
+
+unsigned char * random_mod(int m) {
         int v = rand() % m;
-        return v;
+        return int_to_char(v);
 }
 
 int generate_h_sparse_string(unsigned char * B, int m) {
