@@ -21,9 +21,9 @@ struct ciphertext {
 	unsigned char * C_2;
 };
 
-int char_to_int(int a, unsigned char c[n+1]) {
+int char_to_int(int a, unsigned char* c, int n_) {
 	a = 0;
-	for (int i = 0; i < n; i++) {
+	for (int i = 0; i < n_; i++) {
 		int j = c[i] - '0';
 		a = a + pow(2, i)*j;
 	}
@@ -38,19 +38,23 @@ unsigned char * int_to_char(int a, unsigned char c[n+1]) {
 	return c;
 }
 
-int random_mod(int m) {
-        int v = rand() % m;
+int random_mod(int m, int seed) {
+        int v;
+ 	do {
+		srandom(seed);
+		v = random();
+	} while (v >= m);
         return v;
 }
 
-unsigned char * generate_h_sparse_string(int m, unsigned char B[n+1]) {
+unsigned char * generate_h_sparse_string(int m, unsigned char B[n+1], int seed) {
 	memset(B, n, 0);
 	memset(B, m, 1);
 	B[n] = '\0';
 	int i = m -1;
 	int j;
 	while (i >= 0) {
-		j = random_mod(n - i);
+		j = random_mod(n - i, seed);
 		unsigned char a = B[i];
 		B[i] = B[i+j];
 		B[i+j] = a;
@@ -60,18 +64,52 @@ unsigned char * generate_h_sparse_string(int m, unsigned char B[n+1]) {
 	return B;
 }
 
-int key_gen(int * sk, public_key * pk){
-        unsigned char * F, G, R;
-	F = generate_h_sparse_string(h, F);
-	G = generate_h_sparse_string(h, G);
-	R = int_to_char(random_mod(P), P);
+void det_key_gen(int * sk, public_key * pk, int seed){
+	// Generation de deux arrays de poids h, de taille n
+	A_f = (unsigned char *) calloc(n, sizeof(char));
+	A_f = generate_h_sparse_string(h, A_f, seed);
+	A_g = (unsigned char *) calloc(n, sizeof(char));
+	A_g = generate_h_sparse_string(h, A_g, seed);
+	
 
-	unsigned char T = (F*R + G) % P; // calculs modulo P
+	// Generation d'un array de K octets
+	A_R = (unsigned char*) calloc(K, sizeof(char));
+	for (int i = 0; i < 32; i ++) { // TODO: ici, int to char vers char octet, pas liste binaire
+		A_R[i] = int_to_char(random());
+	}	
 
-	strcpy(pk.R, R);
-	strcat(pk.T, T);
-	strcpy(sk, F);
+	int f, g, R, T;
+	int size = (int)sizeof(A_f) / sizeof(A_f[0]);
+	f = char_to_int(f, A_f, size);
+	g = char_to_int(g, A_g, size);
+	size = (int) sizeof(A_R) / sizeof(A_R[0]);
+	R = (char_to_int(R, A_R, size)) % P;
+	
+	int T = (f*R + g) % P;
+	unsigned char * A_T;
+	A_T = int_to_char(T, A_T);
 
+	strcpy(pk.R, A_R);
+	strcpy(pk.T, A_T);
+	strcpy(sk, f);
+
+	return;
+}
+
+void key_pair(public_key * pk, int * sk) {
+
+	// Generation d'un array de 32 octets
+	SK = (unsigned char*) calloc(32, sizeof(char));
+	for (int i = 0; i < 32; i ++) { // TODO: ici, int to char vers char octet, pas liste binaire
+		SK[i] = int_to_char(random());
+	}	
+	int seed, size;
+	size = (int) sizeof(SK) / sizeof(SK[0]);
+	seed = char_to_int(seed, SK, size);
+	det_key_gen(int * misc, pk, seed);
+	// sk doit etre SK en int ; c'est exactement seed.
+	sk = seed;
+	
 	return;
 }
 
@@ -136,4 +174,28 @@ int decaps(int sk, public_key * pk, ciphertext * C, unsigned char * KK){
 	else {
 		return 0;
 	}
+}
+
+int main(int argc, const char* argv[]) {
+	public_key * pk;
+       	int * sk;
+	key_gen(pk, sk);
+
+	printf(pk, sk);
+
+	ciphertext * C;
+       	int * k;
+	encaps(pk, C, k);
+	unsigned char * KK;
+	decaps(sk, pk, C, KK);
+
+	int kk = char_to_int(kk, KK);
+	if (k == kk) {
+		printf("Success!");
+	}
+	else {
+		printf("Echec...");
+	}
+
+	return 0;
 }
