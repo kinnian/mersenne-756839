@@ -9,6 +9,16 @@ def to_string(x):
     B = "{0:b}".format(x)
     return B
 
+def HW(B):
+    w = 0
+    for i in range(len(B)):
+        if B[i] == 1:
+            w = w +1
+
+    return w
+
+
+# TODO: implementer algo pseudo random
 def random_mod(m):
     v = m
     while v >= m:
@@ -32,7 +42,7 @@ def generate_h_sparse_string(B, h):
 
     return B
 
-def key_pair(h, K, P):
+def det_key_pair(h, K, P, S):
     A_f = []
     A_g = []
     A_f = generate_h_sparse_string(A_f, h)
@@ -50,7 +60,12 @@ def key_pair(h, K, P):
 
     return PK, SK
 
-def kem_enc(h, PK, K, P, S, rho):
+def key_pair(h, K, P):
+    SK = os.urandom(256)
+    PK, _ = det_key_pair(h, K, P, SK)
+    return PK, SK
+
+def det_kem_enc(h, PK, K, P, S, rho):
     SS = os.urandom(32)
     A_a = []
     A_b1 = []
@@ -75,6 +90,31 @@ def kem_enc(h, PK, K, P, S, rho):
                 M[j] = 255
 
     CT = to_string(C1) + to_string(operator.xor(C2[0:32*rho - 1], M))
-    return CT
+    return CT, SS
+
+def kem_enc(h, PK, K, P, rho):
+    S = os.urandom(32)
+    CT, SS = det_kem_enc(h, PK, K, P, S, rho)
+    return CT, SS
+
+def kem_dec(CT, SK, rho, h, P):
+    PK, LongSK = det_key_pair(h, K, P, SK)
+    f = V(LongSK)
+    C1 = V(CT[0:K-1])
+    CC2 = (f*C1) % P
+    M = operator.xor(CC2[0:32*rho - 1], CT[K:K+32*rho-1])
+    S_ = os.urandom(32)
+    for i in range(len(S_)):
+        S_[i] = 0
+    for i in range(255):
+        if HW(M[i*rho/8:(i+1)*rho/8 - 1]) > rho/2:
+            S_[j] = 1
+
+    CT2, SS = det_kem_enc(h, PK, K, P, S_, rho)
+    if CT == CT2:
+        return SS
+    else:
+        SS = []
+        return 'Error'
 
 
