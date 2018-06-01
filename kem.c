@@ -3,25 +3,14 @@
 #include <math.h>
 #include <string.h>
 
+
 // Variables globales
 
-int const n = 756839;
-int const h = 256;
-int const rho = 2048;
-int const P = (pow(2, 756839) - 1);
-int const K = (32*ceil(756839/256));
-
-
-// Structures de cle publique et de chiffre
-struct public_key {
-        unsigned char * T;
-        unsigned char * R;
-};
-
-struct ciphertext {
-	unsigned char * C1;
-	unsigned char * C2;
-};
+#define n  756839
+#define h  256
+#define rho  2048
+#define P (int)(pow(2, 756839) - 1)
+#define K (int)(32*ceil(756839/256))
 
 
 // Fonctions annexes
@@ -34,11 +23,11 @@ int char_to_int(int a, unsigned char* c, int n_) {
 	return a;
 }
 
-unsigned char * int_to_char(int a, unsigned char c[n+1]) {
-	for (int i = 0; i < n; i ++) {
+unsigned char * int_to_char(int a, unsigned char c[K]) {
+	for (int i = 0; i < K; i ++) {
 		c[i] = (a % (int)pow(2,i));
 	}
-	c[n] = '\0';
+	c[K] = '\0';
 	return c;
 }
 
@@ -51,10 +40,9 @@ int random_mod(int m, int seed) {
         return v;
 }
 
-unsigned char * generate_h_sparse_string(int m, unsigned char B[n+1], int seed) {
-	memset(B, n, 0);
-	memset(B, m, 1);
-	B[n] = '\0';
+unsigned char * generate_h_sparse_string(int m, unsigned char B[K], int seed) {
+	memset(B, 0, K);
+	memset(B, 1, m);
 	int i = m -1;
 	int j;
 	while (i >= 0) {
@@ -80,19 +68,40 @@ int h_weight(unsigned char * B) {
 	return w;
 }
 
+void get_subarray(unsigned char * A, unsigned char * B, int first, int last) {
+	for (int i = first; i < last; i ++) {
+		B[i-first] = A[i];
+	}
+	B[last - first] = '\0';
+
+	return;
+}
+
+void xor(unsigned char A[K], unsigned char B[K], unsigned char C[K]) {
+	for (int i = 0; i < K; i ++) {
+		if (A[i] == B[i]) {
+			C[i] = 0;
+		}
+		else {
+			C[i] = 1;
+		}
+	}
+	return;
+}
+
 
 // Generation de cles
-void det_key_pair(int * sk, public_key * pk, int seed){
+void det_key_pair(int * sk, unsigned char * pk, int seed){
 	// Generation de deux arrays de poids h, de taille n
-	A_f = (unsigned char *) calloc(n, sizeof(char));
+	unsigned char A_f[K];
 	A_f = generate_h_sparse_string(h, A_f, seed);
-	A_g = (unsigned char *) calloc(n, sizeof(char));
+	unsigned char A_g[K];
 	A_g = generate_h_sparse_string(h, A_g, seed);
 	
 
 	// Generation d'un array de K octets
-	A_R = (unsigned char*) calloc(K, sizeof(char));
-	for (int i = 0; i < 32; i ++) { 
+	unsigned char A_R[K];
+	for (int i = 0; i < K; i ++) { 
 		A_R[i] = (char)(random());
 	}	
 
@@ -103,38 +112,39 @@ void det_key_pair(int * sk, public_key * pk, int seed){
 	size = (int) sizeof(A_R) / sizeof(A_R[0]);
 	R = (char_to_int(R, A_R, size)) % P;
 	
-	int T = (f*R + g) % P;
-	unsigned char * A_T;
+	T = (f*R + g) % P;
+	unsigned char A_T[K];
 	A_T = int_to_char(T, A_T);
 
-	strcpy(pk.R, A_R);
-	strcpy(pk.T, A_T);
-	strcpy(sk, f);
+	strcpy(pk, A_R);
+	strcat(pk, A_T);
+	sk = &f;
 
 	return;
 }
 
-void key_pair(public_key * pk, int * sk) {
+void key_pair(unsigned char * pk, int * sk) {
 
 	// Generation d'un array de 32 octets
-	SK = (unsigned char*) calloc(32, sizeof(char));
-	for (int i = 0; i < 32; i ++) { // TODO: ici, int to char vers char octet, pas liste binaire
-		SK[i] = int_to_char(random());
+	unsigned char SK[32];
+	for (int i = 0; i < 32; i ++) { 
+		SK[i] = (char)(random());
 	}	
 
 	int seed, size;
 	size = (int) sizeof(SK) / sizeof(SK[0]);
 	seed = char_to_int(seed, SK, size);
-	det_key_pair(int * misc, pk, seed);
+	int * misc;
+	det_key_pair(misc, pk, seed);
 	// sk doit etre SK en int ; c'est exactement seed.
-	sk = seed;
+	sk = &seed;
 	
 	return;
 }
 
 
 // Encapsulation d'un secret commun SS
-void det_kem_enc(public_key *pk, ciphertext * C, unsigned char * SS, unsigned char * S){
+void det_kem_enc(unsigned char *pk, unsigned char * C, unsigned char * SS, unsigned char * S){
 	// On traduit l'array graine en entier
 	int seed = char_to_int(seed, S, 32*sizeof(char));
 
@@ -144,21 +154,22 @@ void det_kem_enc(public_key *pk, ciphertext * C, unsigned char * SS, unsigned ch
 	}	
 	
 	// Generation de a, b1 et b2 pseudo aleatoire de poids h
-	unsigned char A_a[n+1], A_b1[n+1], A_b2[n+1];
+	unsigned char A_a[K], A_b1[K], A_b2[K];
 	A_a = generate_h_sparse_string(h, A_a, seed);
 	A_b1 = generate_h_sparse_string(h, A_b1, seed);
 	A_b2 = generate_h_sparse_string(h, A_b2, seed);
 	int a, b1, b2;
-	a = char_to_int(a, A_a, (n+1)*sizeof(char));
-	b1 = char_to_int(b1, A_b1, (n+1)*sizeof(char));
-	b2 = char_to_int(b2, A_b2, (n+1)*sizeof(char));
+	a = char_to_int(a, A_a, (K+1)*sizeof(char));
+	b1 = char_to_int(b1, A_b1, (K+1)*sizeof(char));
+	b2 = char_to_int(b2, A_b2, (K+1)*sizeof(char));
 
 	// On recupere les elements de la cle publique sous forme d'entiers
-	unsigned char * R = pk.R;
-	unsigned char * T = pk.T;
+	unsigned char A_R[K], A_T[K];
 	int r, t;
-	r = char_to_int(r, R);
-	t = char_to_int(t, T);
+	get_subarray(pk, A_R, 0, K);
+	get_subarray(pk, A_T, K + 1, 2*K); 
+	r = char_to_int(r, A_R, K*sizeof(char));
+	t = char_to_int(t, A_T, K*sizeof(char));
 
 	// On calcule le chiffre
 	int c1, c2;
@@ -166,9 +177,10 @@ void det_kem_enc(public_key *pk, ciphertext * C, unsigned char * SS, unsigned ch
 	c2 = (a*t + b2) % P;
 
 	// On fabrique un message M
+	unsigned char * M;
 	M = (unsigned char*) calloc(32*rho, sizeof(char));
 	for (int i = 0; i < 255; i ++) {
-		if (S[i] == 0) { //TODO: ici c'est le bit i, pas l'octet i
+		if (S[i] == 0) { 
 			for (int j = i*rho/8; i < (i+1)*rho/8 - 1; j ++) {
 				M[j] = 0;
 			}
@@ -177,22 +189,23 @@ void det_kem_enc(public_key *pk, ciphertext * C, unsigned char * SS, unsigned ch
 			for (int j = i*rho/8; i < (i+1)*rho/8 - 1; j ++) {
 				M[j] = 255;
 			}
-
+		}
+	}
 
 	// On enregistre le chiffre sous forme d'arrays
-	unsigned char C1, C2;
+	unsigned char C1[K], C2[K];
        	C1 = int_to_char(c1, C1);
 	C2 = int_to_char(c2, C2);
-	C2 = M^C2;
-	C.C1 = C1;
-	C.C2 = C2; 
+	xor(M, C2, C2);
+	strcpy(C, C1);
+	strcat(C, C2);
 
 	return;
 }
 
-void kem_enc(public_key * pk, ciphertext * CT, unsigned char * SS) {
+void kem_enc(unsigned char * pk, unsigned char * CT, unsigned char * SS) {
 	// On genere la graine sous forme d'array d'octets
-	S = (unsigned char*) calloc(32, sizeof(char));
+	unsigned char S[32];
 	for (int i = 0; i < 32; i ++) {
 		S[i] = (char)(random());
 	}
@@ -205,42 +218,48 @@ void kem_enc(public_key * pk, ciphertext * CT, unsigned char * SS) {
 
 // Decapsulation
 // retourne 0 en cas d'echec, 1 sinon
-int kem_dec(int * sk, ciphertext * C, unsigned char * SS){
+int kem_dec(int * sk, unsigned char * C, unsigned char * SS){
+	
 	// On recupere les parties du chiffre comme int
-	unsigned char * C1 = C.C1;
-	unsigned char * C2 = C.C2;
+	unsigned char C1[K];
+	unsigned char C2[32*rho];
+	C1 = get_subarray(C, C1, 0, K - 1);
+	C2 = get_subarray(C, C2, K, K + 32*rho - 1);
 	int c1, c2;
-	c1 = char_to_int(c1, C1);
-	c2 = char_to_int(c2, C2);
+	c1 = char_to_int(c1, C1, K);
+	c2 = char_to_int(c2, C2, 32*rho);
 
 	// Calcul de PK
-	public_key * pk;
-	int f; 
-	det_keypair(f, pk, sk);
+	unsigned char pk[2*K];
+	int * f; 
+	det_key_pair(f, pk, *sk);
 
 	// Calcul de C2'
-	int c2_ = (f*c1) % P;
-	unsigned char * C2_;
+	int c2_ = ((*f)*c1) % P;
+	unsigned char C2_[K];
 	C2_ = int_to_char(c2_, C2_);
 
 	// Calcul de M
-	unsigned char * M = C2_ ^ C2;
+	unsigned char * M;
+	xor(C2_, C2, M);
 	
 	// On produit S'
-	//TODO: calcul de M_part = M[i*rho/8:(i+1)*rho/8 - 1]
+	unsigned char M_part[rho/8];
+	unsigned char S_[32];
 	S_ = (unsigned char *) calloc(32, sizeof(char));
 	for (int i = 0; i < 255; i ++) {
-		if (h_weight(M_part) > rhp/2) {
+		M_part = get_subarray(M, M_part, i*rho/8, (i+1)*rho/8);
+		if (h_weight(M_part) > rho/2) {
 			S_[i] = 1;
 		}
 	}
 
 	// Calcul de CT2
-	ciphertext * CT2;
+	unsigned char CT2[K + 32*rho];
 	det_kem_enc(pk, CT2, SS, S_);
 
 	// On verifie que tout est correct
-	if ((CT.C1 == CT2.C1) & (CT.C2 == CT2.C2)) {
+	if (*C == *CT2) {
 		return 1;
 	}
 	else {
@@ -252,31 +271,30 @@ int kem_dec(int * sk, ciphertext * C, unsigned char * SS){
 
 
 // Test
-int main(int argc, const char* argv[]) {
-	public_key * pk;
+const int main(int argc, const char* argv[]) {
+	unsigned char pk[2*K];
        	int * sk;
 	key_pair(pk, sk);
 
-	printf(pk, sk);
+	printf("pk : %s, sk : %c\n", pk, *sk);
 
-	ciphertext * C;
+	unsigned char C[K + 32*rho];
 	unsigned char * SS;
 	kem_enc(pk, C, SS);
 
 
 	unsigned char * SS_;
-	decaps(sk, C, SS_);
+	kem_dec(sk, C, SS_);
 
 	int ss, ss_, size;
 	size = sizeof(SS) / sizeof(SS[0]);
 	ss = char_to_int(ss, SS, size);
 	ss_ = char_to_int(ss_, SS_, size);
 	if (ss == ss_) {
-		printf(ss);
-		printf("Success!");
+		printf("ss : %c\n", ss);
 	}
 	else {
-		printf("Echec...");
+		printf("Echec\n");
 	}
 
 	return 0;
