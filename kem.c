@@ -11,16 +11,20 @@ int const rho = 2048;
 int const P = (pow(2, 756839) - 1);
 int const K = (32*ceil(756839/256));
 
+
+// Structures de cle publique et de chiffre
 struct public_key {
         unsigned char * T;
         unsigned char * R;
 };
 
 struct ciphertext {
-	unsigned char * C_1;
-	unsigned char * C_2;
+	unsigned char * C1;
+	unsigned char * C2;
 };
 
+
+// Fonctions annexes
 int char_to_int(int a, unsigned char* c, int n_) {
 	a = 0;
 	for (int i = 0; i < n_; i++) {
@@ -64,7 +68,21 @@ unsigned char * generate_h_sparse_string(int m, unsigned char B[n+1], int seed) 
 	return B;
 }
 
-void det_key_gen(int * sk, public_key * pk, int seed){
+int h_weight(unsigned char * B) {
+	int w= 0;
+	int size = sizeof(B) / sizeof(B[0]);
+	for (int i = 0; i < size; i ++) {
+		if (B[i] != 0) {
+			w ++;
+		}
+	}
+
+	return w;
+}
+
+
+// Generation de cles
+void det_key_pair(int * sk, public_key * pk, int seed){
 	// Generation de deux arrays de poids h, de taille n
 	A_f = (unsigned char *) calloc(n, sizeof(char));
 	A_f = generate_h_sparse_string(h, A_f, seed);
@@ -74,8 +92,8 @@ void det_key_gen(int * sk, public_key * pk, int seed){
 
 	// Generation d'un array de K octets
 	A_R = (unsigned char*) calloc(K, sizeof(char));
-	for (int i = 0; i < 32; i ++) { // TODO: ici, int to char vers char octet, pas liste binaire
-		A_R[i] = int_to_char(random());
+	for (int i = 0; i < 32; i ++) { 
+		A_R[i] = (char)(random());
 	}	
 
 	int f, g, R, T;
@@ -103,94 +121,158 @@ void key_pair(public_key * pk, int * sk) {
 	for (int i = 0; i < 32; i ++) { // TODO: ici, int to char vers char octet, pas liste binaire
 		SK[i] = int_to_char(random());
 	}	
+
 	int seed, size;
 	size = (int) sizeof(SK) / sizeof(SK[0]);
 	seed = char_to_int(seed, SK, size);
-	det_key_gen(int * misc, pk, seed);
+	det_key_pair(int * misc, pk, seed);
 	// sk doit etre SK en int ; c'est exactement seed.
 	sk = seed;
 	
 	return;
 }
 
-void encaps(public_key *pk, ciphertext * C, int k){
+
+// Encapsulation d'un secret commun SS
+void det_kem_enc(public_key *pk, ciphertext * C, unsigned char * SS, unsigned char * S){
+	// On traduit l'array graine en entier
+	int seed = char_to_int(seed, S, 32*sizeof(char));
+
+	// On rempli l'array SS au hasard
+	for (int i = 0; i < 32; i ++) { 
+		SS[i] = (char)(random());
+	}	
+	
+	// Generation de a, b1 et b2 pseudo aleatoire de poids h
+	unsigned char A_a[n+1], A_b1[n+1], A_b2[n+1];
+	A_a = generate_h_sparse_string(h, A_a, seed);
+	A_b1 = generate_h_sparse_string(h, A_b1, seed);
+	A_b2 = generate_h_sparse_string(h, A_b2, seed);
+	int a, b1, b2;
+	a = char_to_int(a, A_a, (n+1)*sizeof(char));
+	b1 = char_to_int(b1, A_b1, (n+1)*sizeof(char));
+	b2 = char_to_int(b2, A_b2, (n+1)*sizeof(char));
+
+	// On recupere les elements de la cle publique sous forme d'entiers
 	unsigned char * R = pk.R;
 	unsigned char * T = pk.T;
 	int r, t;
 	r = char_to_int(r, R);
 	t = char_to_int(t, T);
 
-	k = random_mod(h);
-	int a = H_1(k);
-	int b_1 = H_2(k);
-	int b_2 = H_3(k);
-	// TODO: implem. H_i
-	int tmp = a*r + b_1;
-	unsigned char C_1, C_2;
-       	C_1 = int_to_char(tmp, C_1);
-	tmp = a*t + b_2;
-	C_2 = int_to_char(tmp, C_2);
-	C_2 = encode(k)^C_2; // TODO: implem encode int -> char*
-	C.C_1 = C_1;
-	C.C_2 = C_2; 
+	// On calcule le chiffre
+	int c1, c2;
+	c1 = (a*r + b1) % P;
+	c2 = (a*t + b2) % P;
+
+	// On fabrique un message M
+	M = (unsigned char*) calloc(32*rho, sizeof(char));
+	for (int i = 0; i < 255; i ++) {
+		if (S[i] == 0) { //TODO: ici c'est le bit i, pas l'octet i
+			for (int j = i*rho/8; i < (i+1)*rho/8 - 1; j ++) {
+				M[j] = 0;
+			}
+		}
+		else {
+			for (int j = i*rho/8; i < (i+1)*rho/8 - 1; j ++) {
+				M[j] = 255;
+			}
+
+
+	// On enregistre le chiffre sous forme d'arrays
+	unsigned char C1, C2;
+       	C1 = int_to_char(c1, C1);
+	C2 = int_to_char(c2, C2);
+	C2 = M^C2;
+	C.C1 = C1;
+	C.C2 = C2; 
 
 	return;
 }
 
-// retourne 0 en cas d'échec, 1 sinon
-int decaps(int sk, public_key * pk, ciphertext * C, unsigned char * KK){
-	unsigned char * C_1 = C.C_1;
-	unsigned char * C_2 = C.C_2;
-	unsigned char * R = pk.R;
-	unsigned char * T = pk.T;
-	int c_1, c_2, r, t;
-	c_1 = char_to_int(c_1, C_1);
-	c_2 = char_to_int(c_2, C_2);
-	r = char_to_int(r, R);
-	t = char_to_int(t, T);
+void kem_enc(public_key * pk, ciphertext * CT, unsigned char * SS) {
+	// On genere la graine sous forme d'array d'octets
+	S = (unsigned char*) calloc(32, sizeof(char));
+	for (int i = 0; i < 32; i ++) {
+		S[i] = (char)(random());
+	}
 
-	int tmp = sk*c_1;
-	unsigned char * TMP;
-	TMP = int_to_char(tmp, TMP);
-	TMP = TMP^C_2;
-	kk = decode(TMP); // TODO: implem decode char* -> int
-	int aa = H_1(kk);
-	int bb_1 = H_2(kk);
-	int bb_2 = H_3(kk);
+	det_kem_enc(pk, CT, SS, S);
 
-	int cc_1 = aa*r + bb_1;
-	int cc_2 = AA*T+BB_2;
-	unsigned char * CC_1, CC_2;
-	CC_2 = int_to_char(cc_2, CC_2);
-	CC_2 = CC_2^encode(k);
-	CC_1 = int_to_char(cc_1, CC_1);
-	ciphertext CC;
-	CC.C_1 = CC_1;
-	CC.C_2 = CC_2;
+	return;
+}
 
-	if (C == CC) {
+
+// Decapsulation
+// retourne 0 en cas d'echec, 1 sinon
+int kem_dec(int * sk, ciphertext * C, unsigned char * SS){
+	// On recupere les parties du chiffre comme int
+	unsigned char * C1 = C.C1;
+	unsigned char * C2 = C.C2;
+	int c1, c2;
+	c1 = char_to_int(c1, C1);
+	c2 = char_to_int(c2, C2);
+
+	// Calcul de PK
+	public_key * pk;
+	int f; 
+	det_keypair(f, pk, sk);
+
+	// Calcul de C2'
+	int c2_ = (f*c1) % P;
+	unsigned char * C2_;
+	C2_ = int_to_char(c2_, C2_);
+
+	// Calcul de M
+	unsigned char * M = C2_ ^ C2;
+	
+	// On produit S'
+	//TODO: calcul de M_part = M[i*rho/8:(i+1)*rho/8 - 1]
+	S_ = (unsigned char *) calloc(32, sizeof(char));
+	for (int i = 0; i < 255; i ++) {
+		if (h_weight(M_part) > rhp/2) {
+			S_[i] = 1;
+		}
+	}
+
+	// Calcul de CT2
+	ciphertext * CT2;
+	det_kem_enc(pk, CT2, SS, S_);
+
+	// On verifie que tout est correct
+	if ((CT.C1 == CT2.C1) & (CT.C2 == CT2.C2)) {
 		return 1;
 	}
 	else {
+		free(SS);
 		return 0;
 	}
+
 }
 
+
+// Test
 int main(int argc, const char* argv[]) {
 	public_key * pk;
        	int * sk;
-	key_gen(pk, sk);
+	key_pair(pk, sk);
 
 	printf(pk, sk);
 
 	ciphertext * C;
-       	int * k;
-	encaps(pk, C, k);
-	unsigned char * KK;
-	decaps(sk, pk, C, KK);
+	unsigned char * SS;
+	kem_enc(pk, C, SS);
 
-	int kk = char_to_int(kk, KK);
-	if (k == kk) {
+
+	unsigned char * SS_;
+	decaps(sk, C, SS_);
+
+	int ss, ss_, size;
+	size = sizeof(SS) / sizeof(SS[0]);
+	ss = char_to_int(ss, SS, size);
+	ss_ = char_to_int(ss_, SS_, size);
+	if (ss == ss_) {
+		printf(ss);
 		printf("Success!");
 	}
 	else {
