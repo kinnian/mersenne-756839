@@ -2,15 +2,8 @@
 #include <stdio.h>
 #include <math.h>
 #include <string.h>
+#include "kem.h"
 
-
-// Variables globales
-
-#define n  756839
-#define h  256
-#define rho  2048
-#define P (int)(pow(2, 756839) - 1)
-#define K (int)(32*ceil(756839/256))
 
 
 // Fonctions annexes
@@ -25,7 +18,7 @@ int char_to_int(unsigned char* c, int n_) {
 
 void int_to_char(int a, unsigned char c[K]) {
 	for (int i = 0; i < K; i ++) {
-		c[i] = (a % (int)(pow(2, (double)i)));
+		c[i] = (unsigned char)(a % (int)(pow(2, i)));
 	}
 	c[K] = '\0';
 	return;
@@ -35,7 +28,7 @@ int random_mod(int m, int seed) {
         int v;
  	do {
 		srandom(seed);
-		v = random();
+		v = (int)random();
 	} while (v >= m);
         return v;
 }
@@ -102,7 +95,7 @@ void det_key_pair(int * sk, unsigned char * pk, int seed){
 	// Generation d'un array de K octets
 	unsigned char A_R[K];
 	for (int i = 0; i < K; i ++) { 
-		A_R[i] = (char)(random());
+		A_R[i] = (unsigned char)(random());
 	}	
 
 	int f, g, R, T;
@@ -123,12 +116,12 @@ void det_key_pair(int * sk, unsigned char * pk, int seed){
 	return;
 }
 
-void key_pair(unsigned char * pk, int * sk) {
+void key_pair(int * sk, unsigned char * pk) {
 
 	// Generation d'un array de 32 octets
 	unsigned char SK[32];
 	for (int i = 0; i < 32; i ++) { 
-		SK[i] = (char)(random());
+		SK[i] = (unsigned char)(random());
 	}	
 
 	int seed, size;
@@ -150,7 +143,7 @@ void det_kem_enc(unsigned char *pk, unsigned char * C, unsigned char * SS, unsig
 
 	// On rempli l'array SS au hasard
 	for (int i = 0; i < 32; i ++) { 
-		SS[i] = (char)(random());
+		SS[i] = (unsigned char)(random());
 	}	
 	
 	// Generation de a, b1 et b2 pseudo aleatoire de poids h
@@ -181,12 +174,12 @@ void det_kem_enc(unsigned char *pk, unsigned char * C, unsigned char * SS, unsig
 	M = (unsigned char*) calloc(32*rho, sizeof(char));
 	for (int i = 0; i < 255; i ++) {
 		if (S[i] == 0) { 
-			for (int j = i*rho/8; i < (i+1)*rho/8 - 1; j ++) {
+			for (int j = i*rho/8; j < (j+1)*rho/8 - 1; j ++) {
 				M[j] = 0;
 			}
 		}
 		else {
-			for (int j = i*rho/8; i < (i+1)*rho/8 - 1; j ++) {
+			for (int j = i*rho/8; j < (j+1)*rho/8 - 1; j ++) {
 				M[j] = 255;
 			}
 		}
@@ -207,7 +200,7 @@ void kem_enc(unsigned char * pk, unsigned char * CT, unsigned char * SS) {
 	// On genere la graine sous forme d'array d'octets
 	unsigned char S[32];
 	for (int i = 0; i < 32; i ++) {
-		S[i] = (char)(random());
+		S[i] = (unsigned char)(random());
 	}
 
 	det_kem_enc(pk, CT, SS, S);
@@ -269,10 +262,10 @@ int kem_dec(int * sk, unsigned char * C, unsigned char * SS){
 
 
 // Test
-const int main(int argc, const char* argv[]) {
+int main(int argc, const char* argv[]) {
 	unsigned char pk[2*K];
        	int * sk = 0;
-	key_pair(pk, sk);
+	key_pair(sk, pk);
 
 	printf("pk : %s, sk : %c\n", pk, *sk);
 
