@@ -9,7 +9,6 @@
 // Fonctions annexes
 // Cas ou la liste est une representation binaire
 int char_to_int(unsigned char* c, int n_) {
-//	printf("char to int...\n");
 
 	int a = 0;
 	for (int i = 0; i < n_; i++) {
@@ -17,22 +16,18 @@ int char_to_int(unsigned char* c, int n_) {
 		a = a + (int)(pow(2, (double)i))*j;
 	}
 
-//	printf("...cti fin\n");
 	return a;
 }
 
 // Cas ou la liste est une liste d'octets
 int char_to_int_bytes(unsigned char * c, int size) {
-//	printf("char(b) to int...\n");
 
 	int a = 0;
 	for (int i = 0; i < size; i++) {
 		int j = c[i] - '0';
-//		printf("j = %i\n", j);
 		a = a + (int)(pow(2, (double)(i*8)))*j;
 	}
 
-//	printf("...ctib fin\n");
 	return a;
 }
 
@@ -65,22 +60,19 @@ int random_mod(int m, int seed) {
 
 // Genere une liste en binaire
 void generate_h_sparse_string(int m, unsigned char B[n], int seed) {
-//	printf("Generate h sparse...\n");
 	memset(B, 0, n);
 	memset(B, 1, (unsigned long)m);
 	int i = m -1;
 	int j;
 	while (i >= 0) {
-		seed = rand(); //TODO: trouver comment rendre random_mod(x, seed) indep. de random_mod(y, seed)
+//		seed = rand(); //TODO: trouver comment rendre random_mod(x, seed) indep. de random_mod(y, seed)
 		j = random_mod(n - i, seed);
 		unsigned char a = B[i];
-//		printf("i = %i, indice i+j : %i, taille K : %i\n", i, i+j, K);
 		B[i] = B[i+j];
 		B[i+j] = a;
 		i--;
 	}	
 	
-//	printf("...ghs fin\n");
 	return;
 }
 
@@ -122,7 +114,6 @@ void xor(unsigned char A[n], unsigned char B[n], unsigned char C[n]) {
 
 // Generation de cles
 void det_key_pair(int * sk, unsigned char * pk, int seed){
-//	printf("Det key pair...\n");
 	// Generation de deux listes de poids h, de taille n
 	// Ici, listes en bits
 	unsigned char A_f[n];
@@ -154,14 +145,10 @@ void det_key_pair(int * sk, unsigned char * pk, int seed){
 	strcat((char *)pk, (char *)A_T);
 	sk = &f;
 
-	printf("sk = %i\n", *sk);
-	printf("pk = %s\n", pk);
-//	printf("...dkp fin\n");
 	return;
 }
 
 void key_pair(int * sk, unsigned char * pk) {
-//	printf("Key pair...\n");
 
 	// Generation d'un array de 32 octets
 	unsigned char SK[32];
@@ -177,9 +164,6 @@ void key_pair(int * sk, unsigned char * pk) {
 	// sk doit etre SK en int ; c'est exactement seed.
 	sk = &seed;
 	
-//	printf("sk = %i\n", *sk);
-//	printf("pk : %s\n", pk);
-//	printf("...kp fin\n");
 	return;
 }
 
@@ -353,16 +337,22 @@ int main() {
 	unsigned char SS[32];
 	kem_enc(pk, C, SS);
 
+	printf("C : %s\n", C);
+	printf("SS : %s\n", SS);
 
 	unsigned char SS_[32];
 	kem_dec(&sk, C, SS_);
 
+	printf("SS' : %s\n", SS_);
+
 	int ss, ss_;
 	int size = (int)sizeof(SS) / sizeof(SS[0]);
-	ss = char_to_int(SS, size);
-	ss_ = char_to_int(SS_, size);
+	ss = char_to_int_bytes(SS, size);
+	ss_ = char_to_int_bytes(SS_, size);
+
+	printf("ss et ss' : %i %i\n", ss, ss_);
 	if (ss == ss_) {
-		printf("ss : %c\n", ss);
+		printf("OK");
 	}
 	else {
 		printf("Echec\n");

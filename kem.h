@@ -7,7 +7,9 @@
 
 // Fonctions annexes
 int char_to_int(unsigned char* c, int size);
-void int_to_char(int a, unsigned char c[K]);
+int char_to_int_bytes(unsigned char *c, int size);
+void int_to_char(int a, unsigned char c[n]);
+void int_to_char_bytes(int a, unsigned char c[K]);
 void get_subarray(unsigned char * A, unsigned char * B, int first, int last);
 void xor(unsigned char A[K], unsigned char B[K], unsigned char C[K]);
 
