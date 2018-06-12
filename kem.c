@@ -13,6 +13,7 @@ int char_to_int(unsigned char* c, int n_) {
 	int a = 0;
 	for (int i = 0; i < n_; i++) {
 		int j = c[i] - '0';
+//		printf("cti j : %i\n", j);
 		a = a + (int)(pow(2, (double)i))*j;
 	}
 
@@ -23,29 +24,31 @@ int char_to_int(unsigned char* c, int n_) {
 int char_to_int_bytes(unsigned char * c, int size) {
 
 	int a = 0;
-	for (int i = 0; i < size; i++) {
-		int j = c[i] - '0';
-		a = a + (int)(pow(2, (double)(i*8)))*j;
-	}
-
+//	for (int i = 0; i < size; i++) {
+//		int j = c[i] - '0';
+//		a = a + (int)(pow(2, (double)(i*8)))*j;
+//	}
+	a = atoi(c);
 	return a;
 }
 
 // Renvoie une liste en binaire
 void int_to_char(int a, unsigned char c[n]) {
-	for (int i = 0; i < n; i ++) {
-		c[i] = (unsigned char)(a % (int)(pow(2, i)));
-	}
-	c[K] = '\0';
+//	for (int i = 0; i < n; i ++) {
+//		c[i] = (unsigned char)(a % (int)(pow(2, i)));
+//	}
+//	c[K] = '\0';
+	memcpy(c, &a, n);
 	return;
 }
 
 // Renvoie une liste en octets
 void int_to_char_bytes(int a, unsigned char c[K]) {
-	for (int i = 0; i < K; i ++) {
-		c[i] = (unsigned char)(a % (int)(pow(2, 8*i)));
-	}
-	c[K] = '\0';
+//	for (int i = 0; i < K; i ++) {
+//		c[i] = (unsigned char)(a % (int)(pow(2, 8*i)));
+//	}
+//	c[K] = '\0';
+	sprintf(c, "%d", a);
 	return;
 }
 
@@ -55,7 +58,9 @@ int random_mod(int m, int seed) {
  	do {
 		v = (int)rand();
 	} while (v >= m);
-        return v;
+	//TODO: implementer un PRNG correct
+	//le precedent renvoie *toujours* la même valeur
+        return abs(rand()%m);
 }
 
 // Genere une liste en binaire
@@ -65,7 +70,6 @@ void generate_h_sparse_string(int m, unsigned char B[n], int seed) {
 	int i = m -1;
 	int j;
 	while (i >= 0) {
-//		seed = rand(); //TODO: trouver comment rendre random_mod(x, seed) indep. de random_mod(y, seed)
 		j = random_mod(n - i, seed);
 		unsigned char a = B[i];
 		B[i] = B[i+j];
@@ -242,6 +246,7 @@ void det_kem_enc(unsigned char *pk, unsigned char * C, unsigned char SS[32], uns
 	strcpy((char *)C, (char *)C1);
 	strcat((char *)C, (char *)C2);
 
+	free(M);
 	return;
 }
 
@@ -327,23 +332,40 @@ int kem_dec(int * sk, unsigned char * C, unsigned char * SS){
 // Test
 int main() {
 	unsigned char pk[2*K];
-       	int sk;
+       	int sk = 0;
 	key_pair(&sk, pk);
 
-	printf("pk : %s\n", pk);
+	unsigned char R[K], T[K];
+	get_subarray(pk, R, 0, K - 1);
+	get_subarray(pk, T, K, 2*K - 1);
+	int r, t;
+	r = char_to_int_bytes(R, K);
+	t = char_to_int_bytes(T, K);
+	printf("r : %i et t : %i\n", r, t);
 	printf("sk : %i\n", sk);
 
 	unsigned char C[K + 32*rho];
 	unsigned char SS[32];
 	kem_enc(pk, C, SS);
 
-	printf("C : %s\n", C);
-	printf("SS : %s\n", SS);
+	unsigned char C1[K], C2[32*rho];
+	int c1, c2;
+	get_subarray(C, C1, 0, K - 1);
+	get_subarray(C, C2, K, K + 32*rho - 1);
+	c1 = char_to_int_bytes(C1, K);
+	c2 = char_to_int_bytes(C2, 32*rho);
+	printf("c1 : %i et c2 : %i\n", c1, c2);
 
 	unsigned char SS_[32];
-	kem_dec(&sk, C, SS_);
+	int test = kem_dec(&sk, C, SS_);
+	if (test == 0) {
+		printf("Echec de dechiffrement\n");
+	}
+	else {
+		printf("Dechiffrement ok\n");
+	}
 
-	printf("SS' : %s\n", SS_);
+
 
 	int ss, ss_;
 	int size = (int)sizeof(SS) / sizeof(SS[0]);
