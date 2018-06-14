@@ -13,8 +13,8 @@ void int_to_char_bytes(int a, unsigned char c[K]);
 void get_subarray(unsigned char * A, unsigned char * B, int first, int last);
 void xor(unsigned char A[K], unsigned char B[K], unsigned char C[K]);
 
-int random_mod(int m, int seed);
-void generate_h_sparse_string(int m, unsigned char[K], int seed);
+int random_mod(unsigned int m, int seed);
+void generate_h_sparse_string(unsigned int m, unsigned char[K], int seed);
 int h_weight(unsigned char *);
 
 // Generation de cles

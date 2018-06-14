@@ -12,7 +12,7 @@ int char_to_int(unsigned char* c, int n_) {
 
 	int a = 0;
 	for (int i = 0; i < n_; i++) {
-		int j = c[i] - '0';
+		int j = (int)c[i];
 //		printf("cti j : %i\n", j);
 		a = a + (int)(pow(2, (double)i))*j;
 	}
@@ -24,12 +24,12 @@ int char_to_int(unsigned char* c, int n_) {
 int char_to_int_bytes(unsigned char * c, int size) {
 
 	int a = 0;
-	size = 0;
-//	for (int i = 0; i < size; i++) {
-//		int j = c[i] - '0';
-//		a = a + (int)(pow(2, (double)(i*8)))*j;
-//	}
-	a = atoi((char *)c);
+	for (int i = 0; i < size; i++) {
+		int j = (int)c[i];
+//		printf("ctib j : %i\n", j);
+		a = a + (int)(pow(2, (double)(i*8)))*j;
+	}
+//	a = atoi((char *)c);
 	return a;
 }
 
@@ -53,44 +53,41 @@ void int_to_char_bytes(int a, unsigned char c[K]) {
 	return;
 }
 
-int random_mod(int m, int seed) {
-        int v;
+int random_mod(unsigned int m, int seed) {
+	unsigned int v;
 	srand((unsigned int)seed);
  	do {
-		v = (int)rand();
+		v = (unsigned int)rand();
 	} while (v >= m);
 	//TODO: implementer un PRNG correct
 	//le precedent renvoie *toujours* la même valeur
-        return abs(rand()%m);
+        return rand()%(int)m;
 }
 
 // Genere une liste en binaire
-void generate_h_sparse_string(int m, unsigned char B[n], int seed) {
+void generate_h_sparse_string(unsigned int m, unsigned char B[n], int seed) {
 	memset(B, 0, n);
-	memset(B, 1, (unsigned long)m);
-	int i = m -1;
+	memset(B, 1, m);
+	int i = (int)m -1;
 	int j;
 	while (i >= 0) {
-		j = random_mod(n - i, seed);
+		j = random_mod((unsigned int)(n - i), seed);
 		unsigned char a = B[i];
 		B[i] = B[i+j];
 		B[i+j] = a;
 		i--;
 	}	
-	
 	return;
 }
 
 // Necessite une liste en binaire
 int h_weight(unsigned char * B) {
 	int w= 0;
-	int size = sizeof(B) / sizeof(B[0]);
-	for (int i = 0; i < size; i ++) {
-		if (B[i] != 0) {
+	for (int i = 0; i < n; i ++) {
+		if (B[i] == 1) {
 			w ++;
 		}
 	}
-
 	return w;
 }
 
@@ -120,7 +117,6 @@ void xor(unsigned char A[n], unsigned char B[n], unsigned char C[n]) {
 // Generation de cles
 void det_key_pair(int * sk, unsigned char * pk, int seed){
 	// Generation de deux listes de poids h, de taille n
-	printf("sk ptr : %p\n", (void *)sk);
 	// Ici, listes en bits
 	unsigned char A_f[n];
 	generate_h_sparse_string(h, A_f, seed);
@@ -149,9 +145,7 @@ void det_key_pair(int * sk, unsigned char * pk, int seed){
 
 	strcpy((char *)pk, (char *)A_R);
 	strcat((char *)pk, (char *)A_T);
-	printf(", sk : %d\n", *sk);
 	*sk = f;
-	printf("sk ptr : %p, sk : %d", (void *)sk, *sk);
 
 	return;
 }
@@ -167,12 +161,10 @@ void key_pair(int * sk, unsigned char * pk) {
 	int seed, size;
 	size = (int) sizeof(SK) / sizeof(SK[0]);
 	seed = char_to_int_bytes(SK, size);
-	void * misc = NULL;
-	det_key_pair(misc, pk, seed);
+	int misc = 0;
+	det_key_pair(&misc, pk, seed);
 	// sk doit etre SK en int ; c'est exactement seed.
-	printf("sk ptr : %p, sk : %d", (void *)sk, *sk);
-	sk = &seed;
-	printf("sk ptr : %p, sk : %d", (void *)sk, *sk);
+	*sk = seed;
 	
 	return;
 }
@@ -315,6 +307,7 @@ int kem_dec(int * sk, unsigned char * C, unsigned char * SS){
 	for (int i = 0; i < 255; i ++) {
 		get_subarray(M, M_part, i*rho/8, (i+1)*rho/8);
 		if (h_weight(M_part) > rho/2) {
+			printf("Coucou");
 			S_[i] = 1;
 		}
 	}
@@ -339,7 +332,6 @@ int kem_dec(int * sk, unsigned char * C, unsigned char * SS){
 int main() {
 	unsigned char pk[2*K];
       	int sk = 0;
-	printf("sk ptr : %p\n", (void *)&sk);
 	key_pair(&sk, pk);
 
 	unsigned char R[K], T[K];
@@ -375,7 +367,7 @@ int main() {
 
 
 	int ss, ss_;
-	int size = (int)sizeof(SS) / sizeof(SS[0]);
+	int size = 32;
 	ss = char_to_int_bytes(SS, size);
 	ss_ = char_to_int_bytes(SS_, size);
 
