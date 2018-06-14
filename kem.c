@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <math.h>
 #include <string.h>
+#include <gmp.h>
 #include "kem.h"
 
 
@@ -45,11 +46,13 @@ void int_to_char(int a, unsigned char c[n]) {
 
 // Renvoie une liste en octets
 void int_to_char_bytes(int a, unsigned char c[K]) {
-//	for (int i = 0; i < K; i ++) {
-//		c[i] = (unsigned char)(a % (int)(pow(2, 8*i)));
-//	}
-//	c[K] = '\0';
-	sprintf((char *)c, "%d", a);
+	for (int i = 0; i < K; i++) {
+		int tmp = (a % (int)(pow(2, 8*i)));
+		c[i] = (unsigned char)tmp;
+		a -= tmp*pow(2, 8*i);
+	}
+	c[K] = '\0';
+//	sprintf((char *)c, "%d", a);
 	return;
 }
 
@@ -57,10 +60,11 @@ int random_mod(unsigned int m, int seed) {
 	unsigned int v;
 	srand((unsigned int)seed);
  	do {
-		v = (unsigned int)rand();
+		v = (unsigned int)((int)rand()%(int)(pow(2,20)));
 	} while (v >= m);
-	//TODO: implementer un PRNG correct
-	//le precedent renvoie *toujours* la même valeur
+//	return (int)v;
+//TODO: implementer un PRNG correct
+//le precedent renvoie *toujours* la même valeur
         return rand()%(int)m;
 }
 
@@ -72,6 +76,7 @@ void generate_h_sparse_string(unsigned int m, unsigned char B[n], int seed) {
 	int j;
 	while (i >= 0) {
 		j = random_mod((unsigned int)(n - i), seed);
+//		printf("ghss j : %i\n", j);
 		unsigned char a = B[i];
 		B[i] = B[i+j];
 		B[i+j] = a;
@@ -115,7 +120,7 @@ void xor(unsigned char A[n], unsigned char B[n], unsigned char C[n]) {
 
 
 // Generation de cles
-void det_key_pair(int * sk, unsigned char * pk, int seed){
+void det_key_pair(unsigned char * sk, unsigned char * pk, int seed){
 	// Generation de deux listes de poids h, de taille n
 	// Ici, listes en bits
 	unsigned char A_f[n];
@@ -131,26 +136,30 @@ void det_key_pair(int * sk, unsigned char * pk, int seed){
 		A_R[i] = (unsigned char)(rand());
 	}	
 
-	int f, g, R, T;
-	int size = sizeof(A_f) / sizeof(A_f[0]);
-	f = char_to_int(A_f, size);
-	g = char_to_int(A_g, size);
+	mpz_t f, g, R, T;
+	mpz_inits(f,g,R,T,NULL);
 
-	size = sizeof(A_R) / sizeof(A_R[0]);
-	R = (char_to_int_bytes(A_R, size)) % P;
+//	int size = sizeof(A_f) / sizeof(A_f[0]);
+//	f = char_to_int(A_f, size);
+//	g = char_to_int(A_g, size);
+
+//	size = sizeof(A_R) / sizeof(A_R[0]);
+//	R = (char_to_int_bytes(A_R, size)) % P;
 	
-	T = (f*R + g) % P;
+	mpz_mul(T,f,R);
+	mpz_add(T,T,g);
 	unsigned char A_T[K];
-	int_to_char_bytes(T, A_T);
+//	int_to_char_bytes(T, A_T);
 
 	strcpy((char *)pk, (char *)A_R);
 	strcat((char *)pk, (char *)A_T);
-	*sk = f;
+	strcpy((char *)sk, (char *)A_f);
 
+	mpz_clears(f, g, R, T, NULL);
 	return;
 }
 
-void key_pair(int * sk, unsigned char * pk) {
+void key_pair(unsigned char * sk, unsigned char * pk) {
 
 	// Generation d'un array de 32 octets
 	unsigned char SK[32];
@@ -158,13 +167,12 @@ void key_pair(int * sk, unsigned char * pk) {
 		SK[i] = (unsigned char)(rand());
 	}	
 
-	int seed, size;
-	size = (int) sizeof(SK) / sizeof(SK[0]);
-	seed = char_to_int_bytes(SK, size);
-	int misc = 0;
+	int seed;
+	seed = char_to_int_bytes(SK, 32);
+	unsigned char misc;
 	det_key_pair(&misc, pk, seed);
 	// sk doit etre SK en int ; c'est exactement seed.
-	*sk = seed;
+	strcpy((char *)sk, (char *)SK);
 	
 	return;
 }
@@ -187,26 +195,28 @@ void det_kem_enc(unsigned char *pk, unsigned char * C, unsigned char SS[32], uns
 	generate_h_sparse_string(h, A_a, seed);
 	generate_h_sparse_string(h, A_b1, seed);
 	generate_h_sparse_string(h, A_b2, seed);
-	int a, b1, b2;
-	size = (int)sizeof(A_a) / sizeof(A_a[0]);
-	a = char_to_int(A_a, size);
-	b1 = char_to_int(A_b1, size);
-	b2 = char_to_int(A_b2, size);
+	mpz_t a, b1, b2;
+	mpz_inits(a, b1, b2, NULL);
+//TODO implementer ca
+//	a = char_to_int(A_a, size);
+//	b1 = char_to_int(A_b1, size);
+//	b2 = char_to_int(A_b2, size);
 
 	// On recupere les elements de la cle publique sous forme d'entiers
 	unsigned char A_R[K], A_T[K];
-	int r, t;
+	mpz_t r, t;
+	mpz_inits(r, t, NULL);
 	get_subarray(pk, A_R, 0, K);
 	get_subarray(pk, A_T, K + 1, 2*K); 
-	size = (int)sizeof(A_R) / sizeof(A_R[0]);
-	r = char_to_int_bytes(A_R, size);
-	size = (int)sizeof(A_T) / sizeof(A_T[0]);
-	t = char_to_int_bytes(A_T, size);
+//TODO recuperer les listes en mpz_int
 
 	// On calcule le chiffre
-	int c1, c2;
-	c1 = (a*r + b1) % P;
-	c2 = (a*t + b2) % P;
+	mpz_t c1, c2;
+	mpz_inits(c1,c2,NULL);
+	mpz_mul(c1, a, r);
+	mpz_add(c1, c1, b1);
+	mpz_mul(c2, a, t);
+	mpz_add(c2, c2, b2);
 
 	// On fabrique un message M
 	unsigned char * M;
@@ -226,25 +236,24 @@ void det_kem_enc(unsigned char *pk, unsigned char * C, unsigned char SS[32], uns
 
 	// On enregistre le chiffre sous forme de listes d'octets
 	unsigned char C1[K], C2[K];
-       	int_to_char_bytes(c1, C1);
+//TODO implementer
+//     	int_to_char_bytes(c1, C1);
 	
-	// xor se fait sur des listes de bits, il faut effectuer la conversion
-	unsigned char MM[n], CC2[n];
-	int mm;
-	int_to_char(c2, CC2);
-	size = (int)sizeof(M) / sizeof(M[0]);
-	mm = char_to_int_bytes(M, size);
-	int_to_char_bytes(mm, MM);
-	xor(MM, CC2, CC2);
+	mpz_t m;
+	mpz_init(m);
+//TODO implementer
+//	m = char_to_int(M);
+	mpz_xor(c2, m, c2);
+
 
 	//on re-convertis C2 en liste d'octets
-	size = (int)sizeof(CC2) / sizeof(CC2[0]);
-	c2 = char_to_int(CC2, size);
-	int_to_char_bytes(c2, C2);
+//TODO implementer
+//	int_to_char_bytes(c2, C2);
 	strcpy((char *)C, (char *)C1);
 	strcat((char *)C, (char *)C2);
 
 	free(M);
+	mpz_clears(a, b1, b2, r, t, c1, c2, NULL);
 	return;
 }
 
@@ -263,43 +272,44 @@ void kem_enc(unsigned char * pk, unsigned char * CT, unsigned char SS[32]) {
 
 // Decapsulation
 // retourne 0 en cas d'echec, 1 sinon
-int kem_dec(int * sk, unsigned char * C, unsigned char * SS){
+int kem_dec(unsigned char * sk, unsigned char * C, unsigned char * SS){
 	
 	// On recupere les parties du chiffre comme int
 	unsigned char C1[K];
 	unsigned char C2[32*rho];
 	get_subarray(C, C1, 0, K - 1);
 	get_subarray(C, C2, K, K + 32*rho - 1);
-	int c1;
-	int size = (int)sizeof(C1) / sizeof(C1[0]);
-	c1 = char_to_int_bytes(C1, size);
+	mpz_t c1, c2;
+	mpz_inits(c1, c2, NULL);
+//TODO implementer
+//	c1 = char_to_int_bytes(C1, size);
 
 	// Calcul de PK
 	unsigned char pk[2*K];
-	int f; 
-	det_key_pair(&f, pk, *sk);
+	unsigned char f;
+	int s = char_to_int_bytes(sk, K);
+	det_key_pair(&f, pk, s);
 
 	// Calcul de C2' (en bits)
-	int c2_ = (f*c1) % P;
+	mpz_t SK, c2_;
+	mpz_inits(SK, c2_, NULL);
+//TODO implementer
+//	SK = char_to_int(f, K);
+
+	mpz_mul(c2_, SK, c1);
+//TODO mod P
 	unsigned char C2_[n];
-	int_to_char(c2_, C2_);
+//TODO implementer
+//	int_to_char(c2_, C2_);
 
 	// Calcul de M
-	unsigned char MM[n];
-	// on transforme C2 en liste de bits
-	int c2;
-	size = (int) sizeof(C2) / sizeof(C2[0]);
-	c2 = char_to_int_bytes(C2, size);
-	unsigned char C2_bits[n];
-	int_to_char(c2, C2_bits);
-	xor(C2_, C2_bits, MM);
-
-	// on convertit MM en liste d'octets pour la suite
+	mpz_t m;
+	mpz_init(m);
+	mpz_xor(m, c2, c2_);
+	// on convertit m en liste d'octets pour la suite
 	unsigned char M[K];
-	int m;
-	size = (int) sizeof(MM) / sizeof(MM[0]);
-	m = char_to_int(MM, size);
-	int_to_char_bytes(m, M);
+//TODO implementer
+//	int_to_char_bytes(m, M);
 	
 	// On produit S'
 	unsigned char M_part[rho/8];
@@ -316,6 +326,8 @@ int kem_dec(int * sk, unsigned char * C, unsigned char * SS){
 	unsigned char CT2[K + 32*rho];
 	det_kem_enc(pk, CT2, SS, S_);
 
+	mpz_clears(c1, c2, SK, c2_, m, NULL);
+
 	// On verifie que tout est correct
 	if (*C == *CT2) {
 		return 1;
@@ -331,7 +343,7 @@ int kem_dec(int * sk, unsigned char * C, unsigned char * SS){
 // Test
 int main() {
 	unsigned char pk[2*K];
-      	int sk = 0;
+	unsigned char sk;
 	key_pair(&sk, pk);
 
 	unsigned char R[K], T[K];
@@ -341,7 +353,7 @@ int main() {
 	r = char_to_int_bytes(R, K);
 	t = char_to_int_bytes(T, K);
 	printf("r : %i et t : %i\n", r, t);
-	printf("sk : %i\n", sk);
+	printf("sk : %c\n", sk);
 
 	unsigned char C[K + 32*rho];
 	unsigned char SS[32];

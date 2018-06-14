@@ -4,6 +4,7 @@
 #define rho 2048
 #define P (int)(pow(2, 756839) - 1)
 #define K 94624
+#define RAND_MAX 756839
 
 // Fonctions annexes
 int char_to_int(unsigned char* c, int size);
@@ -18,12 +19,12 @@ void generate_h_sparse_string(unsigned int m, unsigned char[K], int seed);
 int h_weight(unsigned char *);
 
 // Generation de cles
-void det_key_pair(int * sk, unsigned char * pk, int seed);
-void key_pair(int * sk, unsigned char * pk);
+void det_key_pair(unsigned char * sk, unsigned char * pk, int seed);
+void key_pair(unsigned char * sk, unsigned char * pk);
 
 // Encapsulation d'un secret commun SS
 void det_kem_enc(unsigned char * pk, unsigned char * CT, unsigned char * SS, unsigned char * S);
 void kem_enc(unsigned char * pk, unsigned char * CT, unsigned char * SS);
 
 // Decapsulation
-int kem_dec(int * sk, unsigned char * C, unsigned char * SS);
+int kem_dec(unsigned char * sk, unsigned char * C, unsigned char * SS);
