@@ -24,11 +24,12 @@ int char_to_int(unsigned char* c, int n_) {
 int char_to_int_bytes(unsigned char * c, int size) {
 
 	int a = 0;
+	size = 0;
 //	for (int i = 0; i < size; i++) {
 //		int j = c[i] - '0';
 //		a = a + (int)(pow(2, (double)(i*8)))*j;
 //	}
-	a = atoi(c);
+	a = atoi((char *)c);
 	return a;
 }
 
@@ -48,7 +49,7 @@ void int_to_char_bytes(int a, unsigned char c[K]) {
 //		c[i] = (unsigned char)(a % (int)(pow(2, 8*i)));
 //	}
 //	c[K] = '\0';
-	sprintf(c, "%d", a);
+	sprintf((char *)c, "%d", a);
 	return;
 }
 
@@ -119,6 +120,7 @@ void xor(unsigned char A[n], unsigned char B[n], unsigned char C[n]) {
 // Generation de cles
 void det_key_pair(int * sk, unsigned char * pk, int seed){
 	// Generation de deux listes de poids h, de taille n
+	printf("sk ptr : %p\n", (void *)sk);
 	// Ici, listes en bits
 	unsigned char A_f[n];
 	generate_h_sparse_string(h, A_f, seed);
@@ -147,7 +149,9 @@ void det_key_pair(int * sk, unsigned char * pk, int seed){
 
 	strcpy((char *)pk, (char *)A_R);
 	strcat((char *)pk, (char *)A_T);
-	sk = &f;
+	printf(", sk : %d\n", *sk);
+	*sk = f;
+	printf("sk ptr : %p, sk : %d", (void *)sk, *sk);
 
 	return;
 }
@@ -163,10 +167,12 @@ void key_pair(int * sk, unsigned char * pk) {
 	int seed, size;
 	size = (int) sizeof(SK) / sizeof(SK[0]);
 	seed = char_to_int_bytes(SK, size);
-	int * misc = 0;
+	void * misc = NULL;
 	det_key_pair(misc, pk, seed);
 	// sk doit etre SK en int ; c'est exactement seed.
+	printf("sk ptr : %p, sk : %d", (void *)sk, *sk);
 	sk = &seed;
+	printf("sk ptr : %p, sk : %d", (void *)sk, *sk);
 	
 	return;
 }
@@ -332,7 +338,8 @@ int kem_dec(int * sk, unsigned char * C, unsigned char * SS){
 // Test
 int main() {
 	unsigned char pk[2*K];
-       	int sk = 0;
+      	int sk = 0;
+	printf("sk ptr : %p\n", (void *)&sk);
 	key_pair(&sk, pk);
 
 	unsigned char R[K], T[K];
