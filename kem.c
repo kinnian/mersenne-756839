@@ -139,11 +139,10 @@ void det_key_pair(unsigned char * sk, unsigned char * pk, int seed){
 	mpz_t f, g, R, T;
 	mpz_inits(f,g,R,T,NULL);
 
-//TODO implementer
-//	f = char_to_int(A_f, size);
-//	g = char_to_int(A_g, size);
+	mpz_import(f, n, -1,1,0,0, A_f);
+	mpz_import(g, n, -1,1,0,0, A_g);
 
-//	size = sizeof(A_R) / sizeof(A_R[0]);
+//TODO implementer
 //	R = char_to_int_bytes(A_R, size);
 	
 	// Calcul de R % P
@@ -155,12 +154,13 @@ void det_key_pair(unsigned char * sk, unsigned char * pk, int seed){
 
 	mpz_mul(T,f,R);
 	mpz_add(T,T,g);
-	unsigned char A_T[K];
-//	int_to_char_bytes(T, A_T);
 
-	strcpy((char *)pk, (char *)A_R);
-	strcat((char *)pk, (char *)A_T);
-	strcpy((char *)sk, (char *)A_f);
+	size_t countp;
+	mpz_export(pk, &countp, -1,1,0,0, R);
+	printf("ptr pk : %p\n", (void *)pk);
+	printf("ptr pk+K : %p\n", (void *)(pk+K));
+	mpz_export(pk+K, &countp, -1,1,0,0, T);
+	mpz_export(sk, &countp, -1,1,0,0, f);
 
 	mpz_clears(f, g, R, T, r, q, NULL);
 	return;
@@ -187,6 +187,7 @@ void key_pair(unsigned char * sk, unsigned char * pk) {
 
 // Encapsulation d'un secret commun SS
 void det_kem_enc(unsigned char *pk, unsigned char * C, unsigned char SS[32], unsigned char * S){
+	size_t countp;
 	// On traduit la liste graine en entier
 	int size = (int) sizeof(S) / sizeof(S[0]);
 	int seed = char_to_int_bytes(S, size);
@@ -204,35 +205,33 @@ void det_kem_enc(unsigned char *pk, unsigned char * C, unsigned char SS[32], uns
 	generate_h_sparse_string(h, A_b2, seed);
 	mpz_t a, b1, b2;
 	mpz_inits(a, b1, b2, NULL);
-//TODO implementer ca
-//	a = char_to_int(A_a, size);
-//	b1 = char_to_int(A_b1, size);
-//	b2 = char_to_int(A_b2, size);
+//TODO passage de liste de bits a liste d'octets
+	mpz_import(a, n, -1,1,0,0, A_a);
+	mpz_import(b1, n, -1,1,0,0, A_b1);
+	mpz_import(b2, n, -1,1,0,0, A_b2);
 
 	// On recupere les elements de la cle publique sous forme d'entiers
-	unsigned char A_R[K], A_T[K];
-	mpz_t r, t;
-	mpz_inits(r, t, NULL);
-	get_subarray(pk, A_R, 0, K);
-	get_subarray(pk, A_T, K + 1, 2*K); 
-//TODO recuperer les listes en mpz_int
+	mpz_t R, T;
+	mpz_inits(R, T, NULL);
+	mpz_import(R, K, -1,1,0,0, pk);
+	mpz_import(T, K, -1,1,0,0, pk+K);
 
 	// On calcule le chiffre
-	mpz_t c1, c2, f, g;
-	mpz_inits(c1,c2, f, g,NULL);
-	mpz_mul(c1, a, r);
+	mpz_t c1, c2, r, q;
+	mpz_inits(c1,c2, r, q,NULL);
+	mpz_mul(c1, a, R);
 	mpz_add(c1, c1, b1);
-	mpz_mul(c2, a, t);
+	mpz_mul(c2, a, T);
 	mpz_add(c2, c2, b2);
 
 	// Calculs de c1 % P et c2 % P
-	mpz_tdiv_q_2exp(f, c1, n);
-	mpz_tdiv_r_2exp(g, c1, n);
-	mpz_add(c1, f, g);
+	mpz_tdiv_q_2exp(q, c1, n);
+	mpz_tdiv_r_2exp(r, c1, n);
+	mpz_add(c1, r, q);
 	
-	mpz_tdiv_q_2exp(f, c2, n);
-	mpz_tdiv_r_2exp(g, c2, n);
-	mpz_add(c2, f, g);
+	mpz_tdiv_q_2exp(q, c2, n);
+	mpz_tdiv_r_2exp(r, c2, n);
+	mpz_add(c2, r, q);
 
 	// On fabrique un message M
 	unsigned char * M;
@@ -249,27 +248,19 @@ void det_kem_enc(unsigned char *pk, unsigned char * C, unsigned char SS[32], uns
 			}
 		}
 	}
-
-	// On enregistre le chiffre sous forme de listes d'octets
-	unsigned char C1[K], C2[K];
-//TODO implementer
-//     	int_to_char_bytes(c1, C1);
 	
 	mpz_t m;
 	mpz_init(m);
-//TODO implementer
-//	m = char_to_int(M);
+	mpz_import(m, 32*rho, -1,1,0,0, M);
 	mpz_xor(c2, m, c2);
 
 
-	//on re-convertis C2 en liste d'octets
-//TODO implementer
-//	int_to_char_bytes(c2, C2);
-	strcpy((char *)C, (char *)C1);
-	strcat((char *)C, (char *)C2);
+	// On enregistre le chiffre sous forme de listes d'octets
+	mpz_export(C, &countp, -1,1,0,0, c1);
+	mpz_export(C+K, &countp, -1,1,0,0, c2);
 
 	free(M);
-	mpz_clears(a, b1, b2, f, g, r, t, c1, c2, NULL);
+	mpz_clears(a, b1, b2, R, T, r, q, c1, c2, NULL);
 	return;
 }
 
@@ -290,15 +281,11 @@ void kem_enc(unsigned char * pk, unsigned char * CT, unsigned char SS[32]) {
 // retourne 0 en cas d'echec, 1 sinon
 int kem_dec(unsigned char * sk, unsigned char * C, unsigned char * SS){
 	
-	// On recupere les parties du chiffre comme int
-	unsigned char C1[K];
-	unsigned char C2[32*rho];
-	get_subarray(C, C1, 0, K - 1);
-	get_subarray(C, C2, K, K + 32*rho - 1);
+	// On recupere les parties du chiffre comme entiers
 	mpz_t c1, c2;
 	mpz_inits(c1, c2, NULL);
-//TODO implementer
-//	c1 = char_to_int_bytes(C1, size);
+	mpz_import(c1, K, -1,1,0,0, C);
+	mpz_import(c2, 32*rho, -1,1,0,0, C+K);
 
 	// Calcul de PK
 	unsigned char pk[2*K];
@@ -306,13 +293,12 @@ int kem_dec(unsigned char * sk, unsigned char * C, unsigned char * SS){
 	int s = char_to_int_bytes(sk, K);
 	det_key_pair(&f, pk, s);
 
-	// Calcul de C2' (en bits)
+	// Calcul de c2' 
 	mpz_t SK, c2_;
 	mpz_inits(SK, c2_, NULL);
-//TODO implementer
-//	SK = char_to_int(f, K);
-
+	mpz_import(SK, K, -1,1,0,0, &f);
 	mpz_mul(c2_, SK, c1);
+
 	// Calcul de c2_ % P
 	mpz_t r, q;
 	mpz_inits(r, q, NULL);
@@ -321,18 +307,14 @@ int kem_dec(unsigned char * sk, unsigned char * C, unsigned char * SS){
 	mpz_add(c2_, r, q);
 
 
-	unsigned char C2_[n];
-//TODO implementer
-//	int_to_char(c2_, C2_);
-
 	// Calcul de M
 	mpz_t m;
 	mpz_init(m);
 	mpz_xor(m, c2, c2_);
 	// on convertit m en liste d'octets pour la suite
 	unsigned char M[K];
-//TODO implementer
-//	int_to_char_bytes(m, M);
+	size_t countp;
+	mpz_export(M, &countp, -1,1,0,0, m);
 	
 	// On produit S'
 	unsigned char M_part[rho/8];
@@ -351,11 +333,17 @@ int kem_dec(unsigned char * sk, unsigned char * C, unsigned char * SS){
 
 	mpz_clears(c1, c2, SK, c2_, m, r, q, NULL);
 
+	mpz_t c, ct2;
+	mpz_inits(c, ct2, NULL);
+	mpz_import(c, K+32*rho, -1,1,0,0, C);
+	mpz_import(ct2, K+32*rho, -1,1,0,0, CT2);
 	// On verifie que tout est correct
-	if (*C == *CT2) {
+	if (mpz_cmp(c, ct2) == 0) {
+		mpz_clears(c, ct2, NULL);
 		return 1;
 	}
 	else {
+		mpz_clears(c, ct2, NULL);
 		free(SS);
 		return 0;
 	}
