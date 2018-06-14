@@ -139,13 +139,20 @@ void det_key_pair(unsigned char * sk, unsigned char * pk, int seed){
 	mpz_t f, g, R, T;
 	mpz_inits(f,g,R,T,NULL);
 
-//	int size = sizeof(A_f) / sizeof(A_f[0]);
+//TODO implementer
 //	f = char_to_int(A_f, size);
 //	g = char_to_int(A_g, size);
 
 //	size = sizeof(A_R) / sizeof(A_R[0]);
-//	R = (char_to_int_bytes(A_R, size)) % P;
+//	R = char_to_int_bytes(A_R, size);
 	
+	// Calcul de R % P
+	mpz_t r, q;
+	mpz_inits(r, q, NULL);
+	mpz_tdiv_q_2exp(q, R, n);
+	mpz_tdiv_r_2exp(r, R, n);
+	mpz_add(R, r, q);
+
 	mpz_mul(T,f,R);
 	mpz_add(T,T,g);
 	unsigned char A_T[K];
@@ -155,7 +162,7 @@ void det_key_pair(unsigned char * sk, unsigned char * pk, int seed){
 	strcat((char *)pk, (char *)A_T);
 	strcpy((char *)sk, (char *)A_f);
 
-	mpz_clears(f, g, R, T, NULL);
+	mpz_clears(f, g, R, T, r, q, NULL);
 	return;
 }
 
@@ -211,12 +218,21 @@ void det_kem_enc(unsigned char *pk, unsigned char * C, unsigned char SS[32], uns
 //TODO recuperer les listes en mpz_int
 
 	// On calcule le chiffre
-	mpz_t c1, c2;
-	mpz_inits(c1,c2,NULL);
+	mpz_t c1, c2, f, g;
+	mpz_inits(c1,c2, f, g,NULL);
 	mpz_mul(c1, a, r);
 	mpz_add(c1, c1, b1);
 	mpz_mul(c2, a, t);
 	mpz_add(c2, c2, b2);
+
+	// Calculs de c1 % P et c2 % P
+	mpz_tdiv_q_2exp(f, c1, n);
+	mpz_tdiv_r_2exp(g, c1, n);
+	mpz_add(c1, f, g);
+	
+	mpz_tdiv_q_2exp(f, c2, n);
+	mpz_tdiv_r_2exp(g, c2, n);
+	mpz_add(c2, f, g);
 
 	// On fabrique un message M
 	unsigned char * M;
@@ -253,7 +269,7 @@ void det_kem_enc(unsigned char *pk, unsigned char * C, unsigned char SS[32], uns
 	strcat((char *)C, (char *)C2);
 
 	free(M);
-	mpz_clears(a, b1, b2, r, t, c1, c2, NULL);
+	mpz_clears(a, b1, b2, f, g, r, t, c1, c2, NULL);
 	return;
 }
 
@@ -297,7 +313,14 @@ int kem_dec(unsigned char * sk, unsigned char * C, unsigned char * SS){
 //	SK = char_to_int(f, K);
 
 	mpz_mul(c2_, SK, c1);
-//TODO mod P
+	// Calcul de c2_ % P
+	mpz_t r, q;
+	mpz_inits(r, q, NULL);
+	mpz_tdiv_q_2exp(q, c2_, n);
+	mpz_tdiv_r_2exp(r, c2_, n);
+	mpz_add(c2_, r, q);
+
+
 	unsigned char C2_[n];
 //TODO implementer
 //	int_to_char(c2_, C2_);
@@ -326,7 +349,7 @@ int kem_dec(unsigned char * sk, unsigned char * C, unsigned char * SS){
 	unsigned char CT2[K + 32*rho];
 	det_kem_enc(pk, CT2, SS, S_);
 
-	mpz_clears(c1, c2, SK, c2_, m, NULL);
+	mpz_clears(c1, c2, SK, c2_, m, r, q, NULL);
 
 	// On verifie que tout est correct
 	if (*C == *CT2) {
