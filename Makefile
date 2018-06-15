@@ -1,10 +1,11 @@
 CFFLAGS = -std=c11 -Wall -Wextra -g
-LDGLAGS = -lm -lc
+LDGLAGS = -lm -lc -lgmp
 CC = clang
 
 .PHONY: clean
 
-all: kem
+kem: kem.c
+	$(CC) $(CFFLAGS) $(LDGLAGS) -o kem kem.c
 
 clean:
 	rm -rf *.o kem
