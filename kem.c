@@ -123,27 +123,37 @@ void xor(unsigned char A[n], unsigned char B[n], unsigned char C[n]) {
 void det_key_pair(unsigned char * sk, unsigned char * pk, int seed){
 	// Generation de deux listes de poids h, de taille n
 	// Ici, listes en bits
-	unsigned char A_f[n];
-	generate_h_sparse_string(h, A_f, seed);
-	unsigned char A_g[n];
-	generate_h_sparse_string(h, A_g, seed);
-	
+	unsigned char tmp_A_f[n];
+	generate_h_sparse_string(h, tmp_A_f, seed);
+	unsigned char tmp_A_g[n];
+	generate_h_sparse_string(h, tmp_A_g, seed);
+
+	// Passage de listes de bits à listes d'octets
+	int tmp_f = char_to_int(tmp_A_f, n);
+	unsigned char A_f[K];
+	int_to_char_bytes(tmp_f, A_f);
+	int tmp_g = char_to_int(tmp_A_g, n);
+	unsigned char A_g[K];
+	int_to_char_bytes(tmp_g, A_g);
 
 	// Generation d'un liste de K octets
 	// Ici, liste en octets
-	unsigned char A_R[K];
-	for (int i = 0; i < K; i ++) { 
-		A_R[i] = (unsigned char)(rand());
-	}	
+	//unsigned char A_R[K];
+	//for (int i = 0; i < K; i ++) { 
+	//	A_R[i] = (unsigned char)(rand());
+	//}	
 
 	mpz_t f, g, R, T;
 	mpz_inits(f,g,R,T,NULL);
 
-	mpz_import(f, n, -1,1,0,0, A_f);
-	mpz_import(g, n, -1,1,0,0, A_g);
 
-//TODO implementer
-//	R = char_to_int_bytes(A_R, size);
+	mpz_import(f, K, -1,1,0,0, A_f);
+	mpz_import(g, K, -1,1,0,0, A_g);
+	//mpz_import(R, K, -1,1,0,0, A_R);
+	// Generation de R aleatoire
+	gmp_randstate_t state;
+	gmp_randinit_default(state);
+	mpz_urandomb(R, state, n);
 	
 	// Calcul de R % P
 	mpz_t r, q;
@@ -151,14 +161,28 @@ void det_key_pair(unsigned char * sk, unsigned char * pk, int seed){
 	mpz_tdiv_q_2exp(q, R, n);
 	mpz_tdiv_r_2exp(r, R, n);
 	mpz_add(R, r, q);
+	mpz_tdiv_q_2exp(q, R, n);
+	mpz_tdiv_r_2exp(r, R, n);
+	mpz_add(R, r, q);
 
+	// Calcul de T
 	mpz_mul(T,f,R);
 	mpz_add(T,T,g);
 
+	// Calcul de T % P
+        mpz_tdiv_q_2exp(q, T, n);
+        mpz_tdiv_r_2exp(r, T, n);
+        mpz_add(T, r, q);
+        mpz_tdiv_q_2exp(q, T, n);
+        mpz_tdiv_r_2exp(r, T, n);
+        mpz_add(T, r, q);
+	
+
+	size_t sT = mpz_sizeinbase(T, 10);
+	size_t sR = mpz_sizeinbase(R, 10);
+	printf("size of T : %zu, size of R : %zu, K = %u\n", sT, sR, K);
 	size_t countp;
 	mpz_export(pk, &countp, -1,1,0,0, R);
-	printf("ptr pk : %p\n", (void *)pk);
-	printf("ptr pk+K : %p\n", (void *)(pk+K));
 	mpz_export(pk+K, &countp, -1,1,0,0, T);
 	mpz_export(sk, &countp, -1,1,0,0, f);
 

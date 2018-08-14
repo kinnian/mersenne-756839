@@ -2,9 +2,7 @@
 #define n 756839
 #define h 256
 #define rho 2048
-#define P (int)(pow(2, 756839) - 1)
-#define K 94624
-#define RAND_MAX 756839
+#define K (int)(32*ceil(756839/256))
 
 // Fonctions annexes
 int char_to_int(unsigned char* c, int size);
