@@ -3,6 +3,7 @@
 #include <math.h>
 #include <string.h>
 #include <gmp.h>
+#include "rng.h"
 #include "kem.h"
 
 
@@ -56,20 +57,21 @@ void int_to_char_bytes(int a, unsigned char c[K]) {
 	return;
 }
 
-int random_mod(unsigned int m, int seed) {
-	unsigned int v;
-	srand((unsigned int)seed);
+int random_mod(unsigned int m, AES_XOF_struct * seed) {
+	unsigned int v = 0;
  	do {
-		v = (unsigned int)((int)rand()%(int)(pow(2,20)));
+		unsigned char B[3];
+		seedexpander(seed, B, 3);
+		for (int i = 0; i < 3; i++) {
+			v = v + pow(2, 8*i)*B[i];
+		}
 	} while (v >= m);
-//	return (int)v;
-//TODO: implementer un PRNG correct
-//le precedent renvoie *toujours* la même valeur
-        return rand()%(int)m;
+	
+	return (int)v;
 }
 
 // Genere une liste en binaire
-void generate_h_sparse_string(unsigned int m, unsigned char B[n], int seed) {
+void generate_h_sparse_string(unsigned int m, unsigned char B[n], AES_XOF_struct * seed) {
 	memset(B, 0, n);
 	memset(B, 1, m);
 	int i = (int)m -1;
@@ -120,7 +122,7 @@ void xor(unsigned char A[n], unsigned char B[n], unsigned char C[n]) {
 
 
 // Generation de cles
-void det_key_pair(unsigned char * sk, unsigned char * pk, int seed){
+void det_key_pair(unsigned char * sk, unsigned char * pk, AES_XOF_struct * seed){
 	// Generation de deux listes de poids h, de taille n
 	// Ici, listes en bits
 	unsigned char tmp_A_f[n];
@@ -151,10 +153,10 @@ void det_key_pair(unsigned char * sk, unsigned char * pk, int seed){
 	mpz_import(g, K, -1,1,0,0, A_g);
 	//mpz_import(R, K, -1,1,0,0, A_R);
 	// Generation de R aleatoire
-	gmp_randstate_t state;
-	gmp_randinit_default(state);
-	mpz_urandomb(R, state, n);
-	
+	unsigned char A_R[K];
+	seedexpander(seed, A_R, K);
+	mpz_import(R, K, -1,1,0,0, A_R);
+
 	// Calcul de R % P
 	mpz_t r, q;
 	mpz_inits(r, q, NULL);
@@ -197,11 +199,14 @@ void key_pair(unsigned char * sk, unsigned char * pk) {
 	for (int i = 0; i < 32; i ++) { 
 		SK[i] = (unsigned char)(rand());
 	}	
+	
+//	int s = char_to_int_bytes(SK, 32);
 
-	int seed;
-	seed = char_to_int_bytes(SK, 32);
+	AES_XOF_struct seed;
+	unsigned char diversifier[8] = {0,0,0,0,0,0,0,0}; // TODO: trouver ce que c'est cense etre
+	seedexpander_init(&seed, SK, diversifier, 1UL<<30); 
 	unsigned char misc;
-	det_key_pair(&misc, pk, seed);
+	det_key_pair(&misc, pk, &seed);
 	// sk doit etre SK en int ; c'est exactement seed.
 	strcpy((char *)sk, (char *)SK);
 	
@@ -212,21 +217,22 @@ void key_pair(unsigned char * sk, unsigned char * pk) {
 // Encapsulation d'un secret commun SS
 void det_kem_enc(unsigned char *pk, unsigned char * C, unsigned char SS[32], unsigned char * S){
 	size_t countp;
-	// On traduit la liste graine en entier
-	int size = (int) sizeof(S) / sizeof(S[0]);
-	int seed = char_to_int_bytes(S, size);
+	// On traduit la liste graine AES_XOF_struct
+//	int size = (int) sizeof(S) / sizeof(S[0]);
+//	int s = char_to_int_bytes(S, size);
+	AES_XOF_struct seed;
+	unsigned char diversifier[8] = {0,0,0,0,0,0,0,0}; //TODO: same
+	seedexpander_init(&seed, S, diversifier, 1UL<<30);
 
 	// On rempli l'array SS au hasard
-	for (int i = 0; i < 32; i ++) { 
-		SS[i] = (unsigned char)(rand());
-	}	
-	
+	seedexpander(&seed, SS, 32);
+
 	// Generation de a, b1 et b2 pseudo aleatoire de poids h
 	// generate_h_sparse_string renvoie des listes de bits
 	unsigned char A_a[n], A_b1[n], A_b2[n];
-	generate_h_sparse_string(h, A_a, seed);
-	generate_h_sparse_string(h, A_b1, seed);
-	generate_h_sparse_string(h, A_b2, seed);
+	generate_h_sparse_string(h, A_a, &seed);
+	generate_h_sparse_string(h, A_b1, &seed);
+	generate_h_sparse_string(h, A_b2, &seed);
 	mpz_t a, b1, b2;
 	mpz_inits(a, b1, b2, NULL);
 //TODO passage de liste de bits a liste d'octets
@@ -252,7 +258,13 @@ void det_kem_enc(unsigned char *pk, unsigned char * C, unsigned char SS[32], uns
 	mpz_tdiv_q_2exp(q, c1, n);
 	mpz_tdiv_r_2exp(r, c1, n);
 	mpz_add(c1, r, q);
+	mpz_tdiv_q_2exp(q, c1, n);
+	mpz_tdiv_r_2exp(r, c1, n);
+	mpz_add(c1, r, q);
 	
+	mpz_tdiv_q_2exp(q, c2, n);
+	mpz_tdiv_r_2exp(r, c2, n);
+	mpz_add(c2, r, q);
 	mpz_tdiv_q_2exp(q, c2, n);
 	mpz_tdiv_r_2exp(r, c2, n);
 	mpz_add(c2, r, q);
@@ -280,10 +292,13 @@ void det_kem_enc(unsigned char *pk, unsigned char * C, unsigned char SS[32], uns
 
 
 	// On enregistre le chiffre sous forme de listes d'octets
+	size_t sc1 = mpz_sizeinbase(c1, 10);
+	size_t sc2 = mpz_sizeinbase(c2, 10);
+	printf("size of c1 : %zu, size of c2 : %zu, K = %u\n", sc1, sc2, K);
 	mpz_export(C, &countp, -1,1,0,0, c1);
 	mpz_export(C+K, &countp, -1,1,0,0, c2);
 
-	free(M);
+//	free(M);
 	mpz_clears(a, b1, b2, R, T, r, q, c1, c2, NULL);
 	return;
 }
@@ -314,8 +329,11 @@ int kem_dec(unsigned char * sk, unsigned char * C, unsigned char * SS){
 	// Calcul de PK
 	unsigned char pk[2*K];
 	unsigned char f;
-	int s = char_to_int_bytes(sk, K);
-	det_key_pair(&f, pk, s);
+//	int s = char_to_int_bytes(sk, K);
+	AES_XOF_struct seed;
+	unsigned char diversifier[8] = {0,0,0,0,0,0,0,0}; //TODO: same
+	seedexpander_init(&seed, sk, diversifier, 1UL<<30);
+	det_key_pair(&f, pk, &seed);
 
 	// Calcul de c2' 
 	mpz_t SK, c2_;
@@ -337,6 +355,8 @@ int kem_dec(unsigned char * sk, unsigned char * C, unsigned char * SS){
 	mpz_xor(m, c2, c2_);
 	// on convertit m en liste d'octets pour la suite
 	unsigned char M[K];
+	size_t sm = mpz_sizeinbase(m, 10);
+	printf("size of m : %zu,  K = %u\n", sm, K);
 	size_t countp;
 	mpz_export(M, &countp, -1,1,0,0, m);
 	
@@ -346,7 +366,6 @@ int kem_dec(unsigned char * sk, unsigned char * C, unsigned char * SS){
 	for (int i = 0; i < 255; i ++) {
 		get_subarray(M, M_part, i*rho/8, (i+1)*rho/8);
 		if (h_weight(M_part) > rho/2) {
-			printf("Coucou");
 			S_[i] = 1;
 		}
 	}
@@ -355,7 +374,7 @@ int kem_dec(unsigned char * sk, unsigned char * C, unsigned char * SS){
 	unsigned char CT2[K + 32*rho];
 	det_kem_enc(pk, CT2, SS, S_);
 
-	mpz_clears(c1, c2, SK, c2_, m, r, q, NULL);
+//	mpz_clears(c1, c2, SK, c2_, m, r, q, NULL);
 
 	mpz_t c, ct2;
 	mpz_inits(c, ct2, NULL);
@@ -368,7 +387,7 @@ int kem_dec(unsigned char * sk, unsigned char * C, unsigned char * SS){
 	}
 	else {
 		mpz_clears(c, ct2, NULL);
-		free(SS);
+//		free(SS);
 		return 0;
 	}
 
